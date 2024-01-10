@@ -1,30 +1,46 @@
 import json
 
-def extract_high_and_critical_vulnerabilities(data):
+
+def load_json(file_path):
     """
-    Extracts high and critical severity vulnerabilities from the given data.
+    loads JSON data from the file path.
     """
-    high_and_critical_vulnerabilities = []
+    with open(file_path, 'r') as file:
+        return json.load(file)
+
+
+def extract_vulnerabilities(data, severities):
+    """
+    extracts specified severity vulnerabilities from the given data.
+    """
+    vulnerabilities = []
     for dependency in data.get('dependencies', []):
         for vulnerability in dependency.get('vulnerabilities', []):
             severity = vulnerability.get('cvssv3', {}).get('baseSeverity', '').upper()
-            if severity in ['HIGH', 'CRITICAL']:
-                high_and_critical_vulnerabilities.append(vulnerability.get('name'))
-    return high_and_critical_vulnerabilities
+            if severity in severities:
+                vulnerabilities.append((vulnerability.get('name'), severity))
+    return vulnerabilities
 
-def compare_vulnerabilities(branch_data, origin_data):
+
+def compare_vulnerabilities(branch_data, origin_data, severities):
     """
-    Compares vulnerabilities between branch and origin data and returns unique high and critical vulnerabilities in branch.
+    compares vulnerabilities between branch and origin data and returns unique high and critical vulnerabilities in branch.
     """
-    branch_vulnerabilities = set(extract_high_and_critical_vulnerabilities(branch_data))
-    origin_vulnerabilities = set(extract_high_and_critical_vulnerabilities(origin_data))
+    branch_vulnerabilities = set(extract_vulnerabilities(branch_data, severities))
+    origin_vulnerabilities = set(extract_vulnerabilities(origin_data, severities))
     unique_branch_vulnerabilities = branch_vulnerabilities - origin_vulnerabilities
     return list(unique_branch_vulnerabilities)
 
-# Load the JSON files for 'branch' and 'origin' data
-# branch_data = load_json('branch_file.json')
-# origin_data = load_json('origin_file.json')
 
-# Example usage
-# unique_high_and_critical_vulnerabilities = compare_vulnerabilities(branch_data, origin_data)
-# print(unique_high_and_critical_vulnerabilities)
+# load the JSON files for 'branch' and 'origin' data
+branch_data = load_json('OWASP_mr_compare_test-dependency-vulnerability-report.json')
+origin_data = load_json('develop-dependency-vulnerability-report.json')
+
+# specify severities to compare
+sev_compare = ['HIGH', 'CRITICAL']
+
+unique_high_and_critical_vulnerabilities = compare_vulnerabilities(branch_data, origin_data, sev_compare)
+
+for vuln, severity in unique_high_and_critical_vulnerabilities:
+    nvst_url = f"https://nvd.nist.gov/vuln/detail/{vuln}"
+    print(f"{vuln} (Severity: {severity})\n{nvst_url}\n")
